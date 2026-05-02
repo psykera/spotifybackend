@@ -45,7 +45,10 @@ export default async function handler(req, res) {
       return;
     }
 
-    const redirectTo = `https://spotifybackend-chi.vercel.app/?token=${encodeURIComponent(accessToken)}`;
+    const forwardedHost = req.headers['x-forwarded-host'] || req.headers.host || 'localhost';
+    const forwardedProto = req.headers['x-forwarded-proto'] || 'https';
+    const appOrigin = `${forwardedProto}://${forwardedHost}`;
+    const redirectTo = `${appOrigin}/?token=${encodeURIComponent(accessToken)}`;
     if (typeof res.redirect === 'function') {
       res.redirect(redirectTo);
     } else {

@@ -1,7 +1,15 @@
 export default function handler(req, res) {
   const clientId = process.env.SPOTIFY_CLIENT_ID;
   const redirectUri = process.env.SPOTIFY_REDIRECT_URI;
-  const scope = 'user-read-private user-read-email playlist-read-private user-read-recently-played';
+  const scope = [
+    'user-read-private',
+    'user-read-email',
+    'playlist-read-private',
+    'user-read-recently-played',
+    'user-read-currently-playing',
+    'user-read-playback-state',
+    'user-top-read',
+  ].join(' ');
 
   if (!clientId || !redirectUri) {
     res.status(500).json({ error: 'Missing Spotify client configuration' });
