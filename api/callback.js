@@ -45,7 +45,7 @@ export default async function handler(req, res) {
       return;
     }
 
-    const redirectTo = `http://localhost:3000?token=${encodeURIComponent(accessToken)}`;
+    const redirectTo = `https://spotifybackend-chi.vercel.app/?token=${encodeURIComponent(accessToken)}`;
     if (typeof res.redirect === 'function') {
       res.redirect(redirectTo);
     } else {

@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Spotify Connect</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0b0f14;
+        --panel: #121821;
+        --panel-2: #17202b;
+        --text: #e8eef6;
+        --muted: #91a4b7;
+        --accent: #1db954;
+        --accent-2: #1ed760;
+        --border: rgba(255, 255, 255, 0.08);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: radial-gradient(circle at top, #13202b 0%, var(--bg) 45%);
+        color: var(--text);
+      }
+
+      .app {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 32px 20px 48px;
+      }
+
+      .hero {
+        display: grid;
+        gap: 16px;
+        padding: 28px;
+        border: 1px solid var(--border);
+        border-radius: 24px;
+        background: linear-gradient(180deg, rgba(29, 185, 84, 0.12), rgba(18, 24, 33, 0.96));
+        box-shadow: 0 24px 80px rgba(0, 0, 0, 0.25);
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(2rem, 4vw, 3.5rem);
+        line-height: 1.05;
+      }
+
+      p {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.6;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: center;
+      }
+
+      button,
+      .link {
+        appearance: none;
+        border: 0;
+        border-radius: 999px;
+        padding: 12px 18px;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+        text-decoration: none;
+        transition: transform 0.15s ease, background 0.15s ease, opacity 0.15s ease;
+      }
+
+      button:hover,
+      .link:hover {
+        transform: translateY(-1px);
+      }
+
+      .primary {
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        color: #06110a;
+      }
+
+      .secondary {
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--text);
+      }
+
+      .status {
+        padding: 10px 14px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: rgba(0, 0, 0, 0.18);
+        color: var(--muted);
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 18px;
+        margin-top: 24px;
+      }
+
+      .card {
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        background: rgba(18, 24, 33, 0.92);
+        padding: 20px;
+      }
+
+      .card h2 {
+        margin: 0 0 12px;
+        font-size: 1.15rem;
+      }
+
+      .list {
+        display: grid;
+        gap: 12px;
+      }
+
+      .item {
+        padding: 14px;
+        border-radius: 16px;
+        background: var(--panel-2);
+        border: 1px solid var(--border);
+      }
+
+      .item strong {
+        display: block;
+        margin-bottom: 4px;
+      }
+
+      .item small {
+        color: var(--muted);
+      }
+
+      .empty {
+        color: var(--muted);
+        line-height: 1.6;
+      }
+
+      .hidden {
+        display: none !important;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="app">
+      <section class="hero">
+        <div>
+          <h1>Connect to Spotify</h1>
+          <p>
+            Sign in with Spotify, then the app will load your playlists and your recent artists from the token in the callback.
+          </p>
+        </div>
+
+        <div class="actions">
+          <button id="connectBtn" class="primary">Connect Spotify</button>
+          <button id="logoutBtn" class="secondary hidden" type="button">Clear session</button>
+          <span id="status" class="status">Ready to connect.</span>
+        </div>
+      </section>
+
+      <section class="grid hidden" id="dashboard">
+        <article class="card">
+          <h2>Your Playlists</h2>
+          <div id="playlists" class="list"></div>
+        </article>
+
+        <article class="card">
+          <h2>Recent Artists</h2>
+          <div id="artists" class="list"></div>
+        </article>
+      </section>
+    </main>
+
+    <script>
+      const connectBtn = document.getElementById('connectBtn');
+      const logoutBtn = document.getElementById('logoutBtn');
+      const statusEl = document.getElementById('status');
+      const playlistsEl = document.getElementById('playlists');
+      const artistsEl = document.getElementById('artists');
+      const dashboardEl = document.getElementById('dashboard');
+
+      const apiBase = window.location.origin;
+      let accessToken = null;
+
+      function setStatus(message) {
+        statusEl.textContent = message;
+      }
+
+      function showDashboard(show) {
+        dashboardEl.classList.toggle('hidden', !show);
+        logoutBtn.classList.toggle('hidden', !show);
+      }
+
+      function renderItems(container, items, emptyMessage, renderItem) {
+        container.innerHTML = '';
+        if (!items.length) {
+          container.innerHTML = `<div class="empty">${emptyMessage}</div>`;
+          return;
+        }
+
+        for (const item of items) {
+          container.insertAdjacentHTML('beforeend', renderItem(item));
+        }
+      }
+
+      async function fetchJson(url) {
+        const response = await fetch(url, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`${response.status} ${errorText}`);
+        }
+
+        return response.json();
+      }
+
+      async function loadPlaylists() {
+        const data = await fetchJson('https://api.spotify.com/v1/me/playlists?limit=20');
+        const playlists = data.items || [];
+
+        renderItems(
+          playlistsEl,
+          playlists,
+          'No playlists found on this account.',
+          (playlist) => `
+            <div class="item">
+              <strong>${playlist.name || 'Untitled playlist'}</strong>
+              <small>${playlist.tracks?.total ?? 0} tracks · ${playlist.public ? 'Public' : 'Private'}</small>
+            </div>
+          `,
+        );
+      }
+
+      async function loadRecentArtists() {
+        const data = await fetchJson('https://api.spotify.com/v1/me/player/recently-played?limit=50');
+        const seen = new Map();
+
+        for (const entry of data.items || []) {
+          for (const artist of entry.track?.artists || []) {
+            if (!seen.has(artist.id)) {
+              seen.set(artist.id, artist.name);
+            }
+          }
+        }
+
+        const artists = Array.from(seen.values());
+        renderItems(
+          artistsEl,
+          artists,
+          'No recent artists found yet. Play a few tracks and refresh.',
+          (artistName) => `
+            <div class="item">
+              <strong>${artistName}</strong>
+              <small>From recently played tracks</small>
+            </div>
+          `,
+        );
+      }
+
+      async function bootstrap() {
+        const params = new URLSearchParams(window.location.search);
+        const tokenFromQuery = params.get('token');
+
+        if (tokenFromQuery) {
+          accessToken = tokenFromQuery;
+          sessionStorage.setItem('spotify_token', accessToken);
+          window.history.replaceState({}, document.title, window.location.pathname);
+        } else {
+          accessToken = sessionStorage.getItem('spotify_token');
+        }
+
+        if (!accessToken) {
+          showDashboard(false);
+          setStatus('Ready to connect.');
+          return;
+        }
+
+        showDashboard(true);
+        setStatus('Connected. Loading Spotify data...');
+
+        try {
+          await Promise.all([loadPlaylists(), loadRecentArtists()]);
+          setStatus('Spotify data loaded successfully.');
+        } catch (error) {
+          console.error(error);
+          setStatus('Connected, but Spotify data could not be loaded. Check your account permissions.');
+        }
+      }
+
+      connectBtn.addEventListener('click', () => {
+        window.location.href = `${apiBase}/api/login`;
+      });
+
+      logoutBtn.addEventListener('click', () => {
+        sessionStorage.removeItem('spotify_token');
+        accessToken = null;
+        playlistsEl.innerHTML = '';
+        artistsEl.innerHTML = '';
+        showDashboard(false);
+        setStatus('Session cleared.');
+      });
+
+      bootstrap();
+    </script>
+  </body>
+</html>
